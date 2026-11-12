@@ -4,6 +4,7 @@ The master unit is connected by USB (virtual serial port), the slaves are reache
 each command with their two-digit slave ID.
 """
 import time
+from enum import Enum
 
 import serial
 
@@ -47,3 +48,73 @@ class PS10Bus:
     def close(self):
         if self._serial.is_open:
             self._serial.close()
+
+
+class AxisState(str, Enum):
+    """States returned by ?ASTAT (PS 10 manual, command set)."""
+    NOT_INITIALIZED = 'I'
+    DISABLED = 'O'
+    READY = 'R'
+    POSITIONING = 'T'
+    VELOCITY_MODE = 'V'
+    REFERENCE_RUN = 'P'
+    RELEASING_LIMIT_SWITCH = 'F'
+    STOPPED_AT_LIMIT_SWITCH = 'L'
+    STOPPED_AT_BRAKE_SWITCH = 'B'
+    LIMIT_SWITCH_ERROR = 'A'
+    MOTION_CONTROLLER_ERROR = 'M'
+    TIMEOUT = 'Z'
+    PHASE_INITIALIZATION = 'H'
+    NOT_ENABLED = 'U'
+    MOTION_ERROR = 'E'
+
+
+MOVING_STATES = (AxisState.POSITIONING, AxisState.VELOCITY_MODE,
+                 AxisState.REFERENCE_RUN, AxisState.RELEASING_LIMIT_SWITCH)
+
+
+class PS10Axis:
+    """The single axis of one PS 10 unit, in physical units (mm or deg).
+
+    Parameters
+    ----------
+    bus: PS10Bus
+        the serial link shared by all the units
+    slave_id: int or None
+        None for the master, the slave ID otherwise
+    steps_per_unit: float
+        microsteps per mm (linear stage) or per degree (rotation stage)
+    """
+
+    def __init__(self, bus: PS10Bus, slave_id, steps_per_unit: float):
+        self._bus = bus
+        self.slave_id = slave_id
+        self.steps_per_unit = steps_per_unit
+
+    def init(self):
+        """Switch the axis on and use absolute targets."""
+        self._bus.write(self.slave_id, 'INIT1')
+        self._bus.write(self.slave_id, 'ABSOL1')
+
+    def state(self) -> AxisState:
+        """Current state of the axis, see AxisState."""
+        reply = self._bus.query(self.slave_id, '?ASTAT')
+        try:
+            return AxisState(reply)
+        except ValueError:
+            raise PS10Error(f'unknown axis state {reply!r}') from None
+
+    def is_moving(self) -> bool:
+        return self.state() in MOVING_STATES
+
+    def get_position(self) -> float:
+        return int(self._bus.query(self.slave_id, '?CNT1')) / self.steps_per_unit
+
+    def move_abs(self, position: float):
+        """Start a move to position; return without waiting for the end of the move."""
+        steps = round(position * self.steps_per_unit)
+        self._bus.write(self.slave_id, f'PSET1={steps}')
+        self._bus.write(self.slave_id, 'PGO1')
+
+    def stop(self):
+        self._bus.write(self.slave_id, 'STOP1')
