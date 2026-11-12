@@ -72,6 +72,11 @@ class AxisState(str, Enum):
 MOVING_STATES = (AxisState.POSITIONING, AxisState.VELOCITY_MODE,
                  AxisState.REFERENCE_RUN, AxisState.RELEASING_LIMIT_SWITCH)
 
+
+def slave_id_from_config(slave_id) -> int | None:
+    """None for the master ('master' in the configuration), the slave ID otherwise."""
+    return None if slave_id == MASTER else int(slave_id)
+
 def steps_per_unit(pitch: float, gear_ratio: float, fullsteps_per_revolution: int, microsteps: int) -> float:
     """Microsteps per mm (or per degree) of a stage driven by a stepper motor.
 
@@ -101,7 +106,7 @@ class PS10Axis:
     @classmethod
     def from_config(cls, bus: PS10Bus, axis: dict) -> 'PS10Axis':
         """Build an axis from one [[ps10.axes]] block of the configuration."""
-        slave_id = None if axis['slave_id'] == MASTER else int(axis['slave_id'])
+        slave_id = slave_id_from_config(axis['slave_id'])
         return cls(bus, slave_id, steps_per_unit(axis['pitch'], axis['gear_ratio'],
                                                  axis['fullsteps_per_revolution'], axis['microsteps']))
 
