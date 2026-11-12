@@ -18,11 +18,11 @@ fullsteps_per_revolution = 200
 microsteps = 50
 
 [[ps10.axes]]
-name = 'X'
-stage = 'LTM60-25-HSM'
-slave_id = 1
-units = 'mm'
-pitch = 1.0
-gear_ratio = 1.0
+name = "Theta"
+stage = "DMT65-DM6-HSM"
+slave_id = 2
+units = "degree"
+pitch = 360.0
+gear_ratio = 180.0
 fullsteps_per_revolution = 200
 microsteps = 50
