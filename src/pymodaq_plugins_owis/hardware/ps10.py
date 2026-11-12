@@ -132,3 +132,88 @@ class PS10Axis:
 
     def stop(self):
         self._bus.write(self.slave_id, 'STOP1')
+
+class _SimulatedUnit:
+    """State of one simulated PS 10 unit."""
+
+    def __init__(self, velocity: int):
+        self.velocity = velocity  # microsteps per second, as returned by ?PVEL1
+        self.state = AxisState.DISABLED
+        self.absolute = False
+        self.target = 0
+        self._start = 0
+        self._end = 0
+        self._start_time = 0.
+        self._duration = 0.
+
+    def counter(self) -> int:
+        """Current position in microsteps; ends the move when its duration has elapsed."""
+        if self.state == AxisState.POSITIONING:
+            elapsed = time.perf_counter() - self._start_time
+            if elapsed < self._duration:
+                return round(self._start + (self._end - self._start) * elapsed / self._duration)
+            self.state = AxisState.READY
+            self._start = self._end
+        return self._start
+
+    def go(self):
+        start = self.counter()
+        self._start = start
+        self._end = self.target if self.absolute else start + self.target
+        self._start_time = time.perf_counter()
+        self._duration = abs(self._end - start) / self.velocity
+        self.state = AxisState.POSITIONING
+
+    def stop(self):
+        self._start = self.counter()
+        if self.state == AxisState.POSITIONING:
+            self.state = AxisState.READY
+
+
+class MockPS10Bus:
+    """Simulated PS 10 units with the same public methods as PS10Bus, used for tests and for port MOCK.
+
+    Only the commands used by PS10Axis are simulated; any other one raises PS10Error.
+    """
+
+    def __init__(self, slave_ids=(None,), velocity: int = 25000):
+        self._units = {slave_id: _SimulatedUnit(velocity) for slave_id in slave_ids}
+
+    def write(self, slave_id, command: str):
+        unit = self._units.get(slave_id)
+        if unit is None:
+            return  # an absent unit does not react, as on the real bus
+        unit.counter()  # update the state first
+        if command == 'INIT1':
+            unit.state = AxisState.READY
+        elif command == 'ABSOL1':
+            unit.absolute = True
+        elif command == 'RELAT1':
+            unit.absolute = False
+        elif command.startswith('PSET1='):
+            unit.target = int(command.split('=')[1])
+        elif command == 'PGO1':
+            if unit.state == AxisState.READY:
+                unit.go()
+        elif command == 'STOP1':
+            unit.stop()
+        else:
+            raise PS10Error(f'{command} is not simulated')
+
+    def query(self, slave_id, command: str) -> str:
+        unit = self._units.get(slave_id)
+        if unit is None:
+            unit_name = 'master' if slave_id is None else f'slave {slave_id}'
+            raise PS10Error(f'no reply from the {unit_name} to {command}')
+        position = unit.counter()
+        replies = {'?ASTAT': unit.state.value,
+                   '?CNT1': str(position),
+                   '?MODE1': 'ABSOL' if unit.absolute else 'RELAT',
+                   '?PVEL1': str(unit.velocity),
+                   '?VERSION': 'PS10-MOCK'}
+        if command not in replies:
+            raise PS10Error(f'{command} is not simulated')
+        return replies[command]
+
+    def close(self):
+        pass
