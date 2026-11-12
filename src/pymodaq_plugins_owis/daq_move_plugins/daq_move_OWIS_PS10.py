@@ -5,7 +5,6 @@ from pymodaq_utils.utils import ThreadCommand
 from pymodaq_gui.parameter import Parameter
 
 from pymodaq_plugins_owis.hardware.ps10 import MockPS10Bus, PS10Axis, PS10Bus, PS10Error, slave_id_from_config
-from pymodaq_plugins_owis.utils import Config  # noqa: F401, importing it registers the configuration of the plugin
 
 config = GlobalConfig()
 AXES = config('owis', 'ps10', 'axes')

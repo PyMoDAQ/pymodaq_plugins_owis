@@ -26,23 +26,3 @@ pitch = 1.0
 gear_ratio = 1.0
 fullsteps_per_revolution = 200
 microsteps = 50
-
-[[ps10.axes]]
-name = 'Theta'
-stage = 'DMT65-DM6-HSM'
-slave_id = 2
-units = 'deg'
-pitch = 360.0
-gear_ratio = 180.0
-fullsteps_per_revolution = 200
-microsteps = 50
-
-[[ps10.axes]]
-name = 'Y'
-stage = 'LTM60-25-HSM'
-slave_id = 3
-units = 'mm'
-pitch = 1.0
-gear_ratio = 1.0
-fullsteps_per_revolution = 200
-microsteps = 50
