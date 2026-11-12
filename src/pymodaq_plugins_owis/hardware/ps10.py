@@ -11,7 +11,7 @@ import serial
 BAUDRATE = 9600
 TERMINATOR = b'\r'
 COMMAND_DELAY = 0.05  # s, the manual asks for 20 to 40 ms between two commands
-
+MASTER = 'master'  # slave_id of the unit connected by USB in the configuration
 
 class PS10Error(Exception):
     """Raised when a PS 10 unit does not answer a query."""
@@ -72,6 +72,13 @@ class AxisState(str, Enum):
 MOVING_STATES = (AxisState.POSITIONING, AxisState.VELOCITY_MODE,
                  AxisState.REFERENCE_RUN, AxisState.RELEASING_LIMIT_SWITCH)
 
+def steps_per_unit(pitch: float, gear_ratio: float, fullsteps_per_revolution: int, microsteps: int) -> float:
+    """Microsteps per mm (or per degree) of a stage driven by a stepper motor.
+
+    The values are those shown by OWISoft in Control > Define positioning unit.
+    """
+    return gear_ratio * fullsteps_per_revolution * microsteps / pitch
+
 
 class PS10Axis:
     """The single axis of one PS 10 unit, in physical units (mm or deg).
@@ -90,6 +97,13 @@ class PS10Axis:
         self._bus = bus
         self.slave_id = slave_id
         self.steps_per_unit = steps_per_unit
+
+    @classmethod
+    def from_config(cls, bus: PS10Bus, axis: dict) -> 'PS10Axis':
+        """Build an axis from one [[ps10.axes]] block of the configuration."""
+        slave_id = None if axis['slave_id'] == MASTER else int(axis['slave_id'])
+        return cls(bus, slave_id, steps_per_unit(axis['pitch'], axis['gear_ratio'],
+                                                 axis['fullsteps_per_revolution'], axis['microsteps']))
 
     def init(self):
         """Switch the axis on and use absolute targets."""
