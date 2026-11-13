@@ -15,8 +15,20 @@ AXES = config('owis', 'ps10', 'axes')
 class DAQ_Move_OWIS_PS10(DAQ_Move_base):
     """Actuator plugin for OWIS positioning units driven by PS 10 control units.
 
-    The docstring will be completed once the plugin is tested.
+    Each PS 10 drives one axis; several units are chained on their CANopen bus, the first one (master) being
+    connected by USB. One module per axis: the master module opens the bus, the others (same Controller ID, slave)
+    share it. The axes, their PS 10 slave ID and their mechanical data (as shown by OWISoft in
+    Control > Define positioning unit) are described in the [[ps10.axes]] blocks of the configuration file.
+
+    Tested with four PS 10-32 units (firmware PS10-V3.0-181010) driving HVM100N-30-HiSM, LTM60-25-HSM and
+    DMT65-DM6-HSM stages, on Windows 11, Python 3.12, PyMoDAQ 5.3.10. Moves, stop and the reference run (mode 4)
+    were tested on the hardware; the MOCK port simulates the bus for development and tests.
+
+    Installation: the USB driver of the PS 10 (supplied by OWIS with OWISoft) must be installed. The parameters of
+    the stages (currents, limit and reference switches, reference velocities) are those stored in the units:
+    configure each axis once with OWISoft. Close OWISoft before using the plugin, both use the same serial port.
     """
+    
     is_multiaxes = True
     _axis_names = [axis['name'] for axis in AXES]
     _controller_units = [axis['units'] for axis in AXES]

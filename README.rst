@@ -1,46 +1,26 @@
-pymodaq_plugins_template
-########################
+pymodaq_plugins_owis
+####################
 
-.. the following must be adapted to your developed package, links to pypi, github  description...
-
-.. image:: https://img.shields.io/pypi/v/pymodaq_plugins_template.svg
-   :target: https://pypi.org/project/pymodaq_plugins_template/
+.. image:: https://img.shields.io/pypi/v/pymodaq_plugins_owis.svg
+   :target: https://pypi.org/project/pymodaq_plugins_owis/
    :alt: Latest Version
 
 .. image:: https://readthedocs.org/projects/pymodaq/badge/?version=latest
    :target: https://pymodaq.readthedocs.io/en/stable/?badge=latest
    :alt: Documentation Status
 
-.. image:: https://github.com/PyMoDAQ/pymodaq_plugins_template/workflows/Upload%20Python%20Package/badge.svg
-   :target: https://github.com/PyMoDAQ/pymodaq_plugins_template
-   :alt: Publication Status
-
-.. image:: https://github.com/PyMoDAQ/pymodaq_plugins_template/actions/workflows/Test.yml/badge.svg
-    :target: https://github.com/PyMoDAQ/pymodaq_plugins_template/actions/workflows/Test.yml
+.. image:: https://github.com/jerlfan/pymodaq_plugins_owis/actions/workflows/Test.yml/badge.svg
+    :target: https://github.com/jerlfan/pymodaq_plugins_owis/actions/workflows/Test.yml
 
 
-Use this template to create a repository on your account and start the development of your own PyMoDAQ plugin!
+PyMoDAQ plugin for OWIS positioning units driven by PS 10 control units, chained on their CANopen bus.
 
-This branch targets **PyMoDAQ 5.3.x** (Python 3.10 to 3.13). Use the branch matching your PyMoDAQ version.
+This branch targets **PyMoDAQ 5.3.x** (Python 3.10 to 3.13).
 
 Authors
 =======
 
-* First Author  (myemail@xxx.org)
-* Other author (myotheremail@xxx.org)
-
-.. if needed use this field
-
-    Contributors
-    ============
-
-    * First Contributor
-    * Other Contributors
-
-.. if needed use this field
-
-  Depending on the plugin type, delete/complete the fields below
-
+* Jérémie Margueritat (jeremie.margueritat@univ-lyon1.fr)
 
 Instruments
 ===========
@@ -50,50 +30,50 @@ Below is the list of instruments included in this plugin
 Actuators
 +++++++++
 
-* **yyy**: control of yyy actuators
-* **xxx**: control of xxx actuators
-
-Viewer0D
-++++++++
-
-* **yyy**: control of yyy 0D detector
-* **xxx**: control of xxx 0D detector
-
-Viewer1D
-++++++++
-
-* **yyy**: control of yyy 1D detector
-* **xxx**: control of xxx 1D detector
-
-
-Viewer2D
-++++++++
-
-* **yyy**: control of yyy 2D detector
-* **xxx**: control of xxx 2D detector
-
-
-PID Models
-==========
-
-
-Extensions
-==========
+* **OWIS_PS10**: OWIS stages driven by PS 10 control units, one axis per unit, the units being chained on their
+  CANopen bus (tested with HVM100N-30-HiSM, LTM60-25-HSM and DMT65-DM6-HSM stages)
 
 
 Installation instructions
 =========================
 
-* PyMoDAQ’s version.
-* Operating system’s version.
-* What manufacturer’s drivers should be installed to make this plugin run?
+* Tested with PyMoDAQ 5.3.10, Python 3.12, Windows 11.
+* Install the USB driver of the PS 10, supplied by OWIS with OWISoft.
+* Configure each stage once with OWISoft (currents, limit and reference switches, reference velocities): the plugin
+  uses the parameters stored in the units. Close OWISoft before using the plugin, both use the same serial port.
+
+
+Configuration
+=============
+
+The serial port and the axes are read from the configuration of the plugin. Describe your setup in your local
+configuration file (``config_owis.toml`` in the ``config`` folder of your PyMoDAQ user directory), with
+PyMoDAQ closed, since PyMoDAQ rewrites this file when it closes. Each ``[[ps10.axes]]`` block describes one unit,
+with the values shown by OWISoft in *Control > Define positioning unit*::
+
+    [ps10]
+    port = 'COM8'  # MOCK to simulate the units
+
+    [[ps10.axes]]
+    name = 'X'
+    stage = 'LTM60-25-HSM'
+    slave_id = 'master'  # else the slave ID of the unit on the CANopen bus
+    units = 'mm'  # 'degree' for a rotation stage
+    pitch = 1.0
+    gear_ratio = 1.0
+    fullsteps_per_revolution = 200
+    microsteps = 50
+    home_position = 12.5  # position reached after the reference run
+
+The axes of the local file replace those of the template. *Home* runs the reference run of the PS 10 (mode 4:
+approach the reference switch, release it, set the position to 0), then moves the axis to its ``home_position``.
 
 
 Development
 ===========
 
 * Install your plugin in editable mode: ``pip install -e .``
-* Check it, without any hardware: ``check_plugin`` (and ``pytest``)
+* Check it, without any hardware: ``check_plugin`` and ``pytest tests``
 * If you use an AI coding assistant, point it to ``AGENTS.md``: it describes the patterns to follow for instrument
   plugins, Dashboard extensions (``CustomExt``, whenever instruments are involved) and standalone apps
   (``CustomApp``, only if no instruments are needed).
