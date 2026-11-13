@@ -1,2 +1,29 @@
-title = 'this is the configuration file of the plugin XXX'
+title = 'Configuration file of pymodaq_plugins_owis'
 
+[ps10]
+port = 'MOCK'  # serial port of the master PS 10 (e.g. 'COM8'), MOCK for a simulated bus
+
+# One [[ps10.axes]] block per PS 10 unit, with the values shown by OWISoft in
+# Control > Define positioning unit. slave_id is 'master' for the unit connected by USB,
+# else its slave ID on the CANopen bus (Control > CANopen bus > Check hardware).
+
+[[ps10.axes]]
+name = 'Z'
+stage = 'HVM100N-30-HiSM'
+slave_id = 'master'
+units = 'mm'
+pitch = 0.5  # units per revolution of the spindle (mm, or deg for a rotation stage)
+gear_ratio = 1.0
+fullsteps_per_revolution = 200
+microsteps = 50
+home_position = 15  # position reached after the reference run, in the unit of the axis
+
+[[ps10.axes]]
+name = "Theta"
+stage = "DMT65-DM6-HSM"
+slave_id = 2
+units = "degree"
+pitch = 360.0
+gear_ratio = 180.0
+fullsteps_per_revolution = 200
+microsteps = 50
