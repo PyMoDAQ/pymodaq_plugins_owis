@@ -16,6 +16,7 @@ pitch = 0.5  # units per revolution of the spindle (mm, or deg for a rotation st
 gear_ratio = 1.0
 fullsteps_per_revolution = 200
 microsteps = 50
+home_position = 15  # position reached after the reference run, in the unit of the axis
 
 [[ps10.axes]]
 name = "Theta"

@@ -3,6 +3,8 @@ from pymodaq.control_modules.move_utility_classes import (DAQ_Move_base, comon_p
 from pymodaq_utils.config import GlobalConfig
 from pymodaq_utils.utils import ThreadCommand
 from pymodaq_gui.parameter import Parameter
+from qtpy import QtCore
+
 
 from pymodaq_plugins_owis.hardware.ps10 import MockPS10Bus, PS10Axis, PS10Bus, PS10Error, slave_id_from_config
 
@@ -29,6 +31,10 @@ class DAQ_Move_OWIS_PS10(DAQ_Move_base):
     def ini_attributes(self):
         self.controller: PS10Bus | MockPS10Bus | None = None
         self.axis: PS10Axis | None = None
+        self._home_timer = QtCore.QTimer()
+        self._home_timer.setInterval(100)
+        self._home_timer.timeout.connect(self._check_home)
+        self._returning_home = False
 
     def ini_stage(self, controller=None):
         """Open the bus (master module) or reuse the one of the master, then switch the chosen axis on."""
@@ -74,14 +80,36 @@ class DAQ_Move_OWIS_PS10(DAQ_Move_base):
         self.axis.move_abs(target.value(self.axis_unit))
 
     def move_home(self):
-        """Reference run, not implemented yet.
+        """Reference run of the axis (REF1=4), then move to the home_position of the configuration.
 
-        OWISoft uses the reference type 4 (REF1=4) for these stages; it has to be tested on the hardware first.
+        PyMoDAQ does not poll the position after move_home: _check_home calls move_done at the end.
         """
-        raise NotImplementedError('the reference run of the PS 10 is not implemented yet')
+        self._returning_home = False
+        self.axis.reference()
+        self._home_timer.start()
+
+    def _check_home(self):
+        """Called every 100 ms during move_home: chain the reference run and the move to home_position."""
+        if self.axis.is_moving():
+            return
+        if not self._returning_home:
+            if not self.axis.is_referenced():
+                self._home_timer.stop()
+                self.emit_status(ThreadCommand('Update_Status',
+                                               [f'reference run of {self.axis_name} failed: {self.axis.state().name}']))
+                self.move_done()
+                return
+            home_position = AXES[self.axis_index_key].get('home_position', 0.)
+            if home_position != 0.:
+                self._returning_home = True
+                self.axis.move_abs(home_position)
+                return
+        self._home_timer.stop()
+        self.move_done()
 
     def stop_motion(self):
         """Stop the axis and tell PyMoDAQ that the move is over."""
+        self._home_timer.stop()
         self.axis.stop()
         self.move_done()
 

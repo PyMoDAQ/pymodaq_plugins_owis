@@ -2,10 +2,10 @@
 import pytest
 
 from pymodaq.utils.data import DataActuator
-from pymodaq.utils.plugin_testing import make_actuator, move_abs_and_wait, move_rel_and_wait
+from pymodaq.utils.plugin_testing import make_actuator, move_abs_and_wait, move_home_and_wait, move_rel_and_wait
 from pymodaq.utils.plugin_testing.harness import wait_for_signal
 
-from pymodaq_plugins_owis.daq_move_plugins.daq_move_OWIS_PS10 import DAQ_Move_OWIS_PS10
+from pymodaq_plugins_owis.daq_move_plugins.daq_move_OWIS_PS10 import AXES,DAQ_Move_OWIS_PS10
 from pymodaq_plugins_owis.hardware.ps10 import (AxisState, MockPS10Bus, PS10Axis, PS10Error,
                                                 slave_id_from_config, steps_per_unit)
 
@@ -82,3 +82,9 @@ def test_slave_shares_the_bus_of_the_master(actuator):
     assert slave.initialized
     assert slave.controller is actuator.controller
     slave.close()
+
+def test_move_home_ends_at_home_position(actuator):
+    move_abs_and_wait(actuator, 0.5)
+    position = move_home_and_wait(actuator, timeout_ms=20000)
+    home = AXES[actuator.axis_index_key].get('home_position', 0.)
+    assert position.value(actuator.axis_unit) == pytest.approx(home, abs=actuator.epsilon)

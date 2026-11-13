@@ -67,6 +67,7 @@ class AxisState(str, Enum):
     PHASE_INITIALIZATION = 'H'
     NOT_ENABLED = 'U'
     MOTION_ERROR = 'E'
+    UNKNOWN = '?'
 
 
 MOVING_STATES = (AxisState.POSITIONING, AxisState.VELOCITY_MODE,
@@ -97,7 +98,6 @@ class PS10Axis:
     steps_per_unit: float
         microsteps per mm (linear stage) or per degree (rotation stage)
     """
-
     def __init__(self, bus: PS10Bus, slave_id, steps_per_unit: float):
         self._bus = bus
         self.slave_id = slave_id
@@ -111,8 +111,13 @@ class PS10Axis:
                                                  axis['fullsteps_per_revolution'], axis['microsteps']))
 
     def init(self):
-        """Switch the axis on and use absolute targets."""
-        self._bus.write(self.slave_id, 'INIT1')
+        """Switch the axis on if needed and use absolute targets.
+
+        INIT1 is sent only when the axis is not ready: on a PS 10 it also clears the validity of the
+        reference run (?REFST1), even on an axis that is already switched on.
+        """
+        if self.state() != AxisState.READY:
+            self._bus.write(self.slave_id, 'INIT1')
         self._bus.write(self.slave_id, 'ABSOL1')
 
     def state(self) -> AxisState:
@@ -138,6 +143,19 @@ class PS10Axis:
     def stop(self):
         self._bus.write(self.slave_id, 'STOP1')
 
+    def reference(self, mode: int = 4):
+        """Start a reference run, REF1=mode in the PS 10 manual.
+
+        Mode 4, used by OWISoft for these stages, approaches the reference switch, releases it and sets the
+        position to 0. The run ends when the axis is no longer moving.
+        """
+        self._bus.write(self.slave_id, f'REF1={mode}')
+
+    def is_referenced(self) -> bool:
+        """True after a successful reference run; reset when an open-loop stepper motor is switched off."""
+        return self._bus.query(self.slave_id, '?REFST1') == '1'
+
+
 class _SimulatedUnit:
     """State of one simulated PS 10 unit."""
 
@@ -150,16 +168,32 @@ class _SimulatedUnit:
         self._end = 0
         self._start_time = 0.
         self._duration = 0.
+        self.referenced = False
 
     def counter(self) -> int:
         """Current position in microsteps; ends the move when its duration has elapsed."""
-        if self.state == AxisState.POSITIONING:
+        if self.state in (AxisState.POSITIONING, AxisState.REFERENCE_RUN):
             elapsed = time.perf_counter() - self._start_time
             if elapsed < self._duration:
                 return round(self._start + (self._end - self._start) * elapsed / self._duration)
+            if self.state == AxisState.REFERENCE_RUN:
+                self.referenced = True
             self.state = AxisState.READY
             self._start = self._end
         return self._start
+
+    def reference(self):
+        start = self.counter()
+        self._start = start
+        self._end = 0
+        self._start_time = time.perf_counter()
+        self._duration = abs(start) / self.velocity
+        self.state = AxisState.REFERENCE_RUN
+
+    def stop(self):
+        self._start = self.counter()
+        if self.state in (AxisState.POSITIONING, AxisState.REFERENCE_RUN):
+            self.state = AxisState.READY
 
     def go(self):
         start = self.counter()
@@ -168,11 +202,6 @@ class _SimulatedUnit:
         self._start_time = time.perf_counter()
         self._duration = abs(self._end - start) / self.velocity
         self.state = AxisState.POSITIONING
-
-    def stop(self):
-        self._start = self.counter()
-        if self.state == AxisState.POSITIONING:
-            self.state = AxisState.READY
 
 
 class MockPS10Bus:
@@ -202,6 +231,9 @@ class MockPS10Bus:
                 unit.go()
         elif command == 'STOP1':
             unit.stop()
+        elif command.startswith('REF1='):
+            if unit.state == AxisState.READY:
+                unit.reference()
         else:
             raise PS10Error(f'{command} is not simulated')
 
@@ -215,7 +247,8 @@ class MockPS10Bus:
                    '?CNT1': str(position),
                    '?MODE1': 'ABSOL' if unit.absolute else 'RELAT',
                    '?PVEL1': str(unit.velocity),
-                   '?VERSION': 'PS10-MOCK'}
+                   '?VERSION': 'PS10-MOCK',
+                   '?REFST1': '1' if unit.referenced else '0'}
         if command not in replies:
             raise PS10Error(f'{command} is not simulated')
         return replies[command]
