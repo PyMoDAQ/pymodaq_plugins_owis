@@ -9,8 +9,8 @@ pymodaq_plugins_owis
    :target: https://pymodaq.readthedocs.io/en/stable/?badge=latest
    :alt: Documentation Status
 
-.. image:: https://github.com/jerlfan/pymodaq_plugins_owis/actions/workflows/Test.yml/badge.svg
-    :target: https://github.com/jerlfan/pymodaq_plugins_owis/actions/workflows/Test.yml
+.. image:: https://github.com/PyMoDAQ/pymodaq_plugins_owis/actions/workflows/Test.yml/badge.svg
+    :target: https://github.com/PyMoDAQ/pymodaq_plugins_owis/actions/workflows/Test.yml
 
 
 PyMoDAQ plugin for OWIS positioning units driven by PS 10 control units, chained on their CANopen bus.
